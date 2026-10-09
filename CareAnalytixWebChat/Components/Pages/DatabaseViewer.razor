@@ -1,0 +1,68 @@
+@page "/database"
+@using CareAnalytixWebChat.Services
+@inject ExcelDataService ExcelService
+
+<PageTitle>Database Viewer (Excel)</PageTitle>
+
+<h1>Database Viewer</h1>
+
+<p>This page shows the data directly from <strong>Trainig.xlsx</strong>.</p>
+
+@if (ErrorMessage != null)
+{
+    <div class="alert alert-danger" role="alert">
+        <strong>Error:</strong> @ErrorMessage
+    </div>
+}
+else if (TrainingDataList == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (TrainingDataList.Count == 0)
+{
+    <p>No data found in the Excel file.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                @if (TrainingDataList.FirstOrDefault() != null)
+                {
+                    @foreach (var key in TrainingDataList.First().Keys)
+                    {
+                        <th>@key</th>
+                    }
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in TrainingDataList)
+            {
+                <tr>
+                    @foreach(var value in item.Values)
+                    {
+                        <td>@value</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Dictionary<string, string>>? TrainingDataList;
+    private string? ErrorMessage;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            TrainingDataList = ExcelService.GetSheetData(1);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = "Could not read the Excel file. Details: " + ex.Message;
+        }
+    }
+}

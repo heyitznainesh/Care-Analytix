@@ -1,0 +1,29 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.suo
+
+# User specific exclusions
+Doc/
+temp_docx1/
+temp_docx2/
+
+# AI Models & Setup
+LocalAI_Setup/
+*.gguf
+*.bin
+*.pt
+*.safetensors
+
+# Duplicate Project Folders
+Care-Analytix/
+CareAnalytix/
+"Care Analytix/"
+CareAnalytixChatApp/
+TestApp/
+
+Phi4Model/
+*.onnx
+*.onnx.data

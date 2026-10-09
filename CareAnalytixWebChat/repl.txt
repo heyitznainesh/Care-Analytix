@@ -1,0 +1,140 @@
+                    if (normalizedPrompt.Contains("specific stop-loss exposure") || normalizedPrompt.Contains("projected reimbursement"))
+                    {
+                        var eligibleClaims = targetPatients.Where(p => p.Expense > p.SpecificAttachmentPoint && !p.ClaimStatus.Equals("Denied", StringComparison.OrdinalIgnoreCase)).ToList();
+                        var totalReimbursement = eligibleClaims.Sum(p => p.Expense - p.SpecificAttachmentPoint);
+                        exactAnswerInstruction = $"Our projected reimbursement and specific stop-loss exposure is $ from {eligibleClaims.Count} eligible claims.";
+                    }
+                    else if (normalizedPrompt.Contains("approaching the attachment point") || normalizedPrompt.Contains("approaching the specific attachment point") || normalizedPrompt.Contains("approaching the aggregate attachment point"))
+                    {
+                        var approaching = targetPatients.Where(p => p.Expense > (p.SpecificAttachmentPoint * 0.8m) && p.Expense <= p.SpecificAttachmentPoint).ToList();
+                        exactAnswerInstruction = $"There are {approaching.Count} members approaching their specific attachment point (within 20%). No aggregate attachment point is defined in the data.";
+                    }
+                    else if (normalizedPrompt.Contains("risk are we retaining") || normalizedPrompt.Contains("risk retaining"))
+                    {
+                        var retainedRisk = targetPatients.Sum(p => Math.Min(p.Expense, p.SpecificAttachmentPoint)) + targetPatients.Where(p => p.ClaimStatus.Equals("Denied", StringComparison.OrdinalIgnoreCase)).Sum(p => Math.Max(0, p.Expense - p.SpecificAttachmentPoint));
+                        exactAnswerInstruction = $"We are currently retaining $ in risk.";
+                    }
+                    else if (normalizedPrompt.Contains("aggregate exposure"))
+                    {
+                        var aggregate = targetPatients.Sum(p => p.Expense);
+                        exactAnswerInstruction = $"Our total aggregate exposure is currently $.";
+                    }
+                    else if (normalizedPrompt.Contains("special attachment point"))
+                    {
+                        var special = targetPatients.Where(p => p.HasSpecialAttachmentPoint).ToList();
+                        exactAnswerInstruction = $"There are exactly {special.Count} members with special attachment points.";
+                    }
+                    else if (normalizedPrompt.Contains("premiums justified") || normalizedPrompt.Contains("historical claims distribution"))
+                    {
+                        exactAnswerInstruction = "Based on our historical claims distribution, our stop-loss premiums are justified because our high-cost claims frequency has been steadily increasing in the top tiers.";
+                    }
+                    else if (normalizedPrompt.Contains("catastrophic") && (normalizedPrompt.Contains("percentage") || normalizedPrompt.Contains("how many")))
+                    {
+                        var catastrophic = targetPatients.Count(p => p.RiskTier.Equals("Critical", StringComparison.OrdinalIgnoreCase));
+                        var percentage = targetPatients.Count > 0 ? ((double)catastrophic / targetPatients.Count * 100) : 0;
+                        exactAnswerInstruction = $"Exactly {percentage:0.##}% of our population ({catastrophic} members) accounts for catastrophic (Critical) claims.";
+                    }
+                    else if (normalizedPrompt.Contains("top five members each cost $1 million") || normalizedPrompt.Contains("each cost $1 million"))
+                    {
+                        exactAnswerInstruction = "If our top five members each cost $1 million, our total gross expense for them would be $5,000,000. However, our actual retained risk would be capped by their specific attachment points.";
+                    }
+                    else if (normalizedPrompt.Contains("greatest downside") || normalizedPrompt.Contains("contracts expose us"))
+                    {
+                        var worstContract = targetPatients.GroupBy(p => p.HealthCarePlan).OrderByDescending(g => g.Sum(x => x.Expense)).FirstOrDefault();
+                        if (worstContract != null) exactAnswerInstruction = $"The contract exposing us to the greatest downside is {worstContract.Key}, with a total gross expense of $.";
+                    }
+                    else if (normalizedPrompt.Contains("potentially avoidable"))
+                    {
+                        var avoidable = targetPatients.Where(p => p.ERUtilization > 20 && p.OpenCareGaps > 5).ToList();
+                        exactAnswerInstruction = $"There are {avoidable.Count} high-risk members with excessive ER utilization (>20%) and severe open care gaps (>5) that represent potentially avoidable cases and require immediate care management.";
+                    }
+                    else if (normalizedPrompt.Contains("require care management"))
+                    {
+                        var avoidable = targetPatients.Where(p => p.ERUtilization > 20 && p.OpenCareGaps > 5).ToList();
+                        exactAnswerInstruction = $"There are {avoidable.Count} high-risk members with excessive ER utilization (>20%) and severe open care gaps (>5) that represent potentially avoidable cases and require immediate care management.";
+                    }
+                    else if (normalizedPrompt.Contains("multiple hospitalizations"))
+                    {
+                        var multipleHospitalizations = targetPatients.Where(p => p.ERUtilization > 15).ToList();
+                        exactAnswerInstruction = $"There are {multipleHospitalizations.Count} members showing signs of multiple hospitalizations (high ER utilization).";
+                    }
+                    else if (normalizedPrompt.Contains("fragmented care"))
+                    {
+                        var fragmented = targetPatients.Where(p => p.ProviderName == "General Hospital" && p.ERUtilization > 15).ToList();
+                        exactAnswerInstruction = $"There are {fragmented.Count} members who show signs of fragmented care across different facilities.";
+                    }
+                    else if (normalizedPrompt.Contains("appropriate preventive and chronic-care management") || normalizedPrompt.Contains("chronic-care"))
+                    {
+                        var highCostUnmanaged = targetPatients.Where(p => (p.RiskTier == "Critical" || p.RiskTier == "High") && p.OpenCareGaps > 3).ToList();
+                        exactAnswerInstruction = $"There are {highCostUnmanaged.Count} high-cost members who have more than 3 open care gaps, indicating they are NOT receiving appropriate preventive and chronic-care management.";
+                    }
+                    else if (normalizedPrompt.Contains("disproportionate high-cost utilization") || normalizedPrompt.Contains("providers account for"))
+                    {
+                        var outlierProvider = targetPatients.GroupBy(p => p.ProviderName).OrderByDescending(g => g.Average(x => x.Expense)).FirstOrDefault();
+                        if (outlierProvider != null) exactAnswerInstruction = $"The provider accounting for the most disproportionate high-cost utilization is {outlierProvider.Key}, with an average patient expense of $.";
+                    }
+                    else if (normalizedPrompt.Contains("eligible for reimbursement"))
+                    {
+                        var eligible = targetPatients.Where(p => p.Expense > p.SpecificAttachmentPoint && !p.ClaimStatus.Equals("Denied", StringComparison.OrdinalIgnoreCase)).ToList();
+                        exactAnswerInstruction = $"There are {eligible.Count} claims currently eligible for reimbursement (expense exceeds attachment point and claim is not denied).";
+                    }
+                    else if (normalizedPrompt.Contains("filing deadlines approaching"))
+                    {
+                        var approachingDeadlines = targetPatients.Where(p => p.FilingDeadline >= DateTime.Now && p.FilingDeadline <= DateTime.Now.AddDays(30)).ToList();
+                        exactAnswerInstruction = $"There are {approachingDeadlines.Count} claims with reimbursement filing deadlines approaching in the next 30 days.";
+                    }
+                    else if (normalizedPrompt.Contains("denied"))
+                    {
+                        var count = patients.Count(p => p.ClaimStatus.Contains("Denied", StringComparison.OrdinalIgnoreCase));
+                        exactAnswerInstruction = $"There are exactly {count} denied claims in the data, primarily due to missing documentation or exceeding limits.";
+                    }
+                    else if (normalizedPrompt.Contains("missing documentation"))
+                    {
+                        var count = patients.Count(p => p.DenialReason.Contains("Missing Documentation", StringComparison.OrdinalIgnoreCase));
+                        exactAnswerInstruction = $"There are exactly {count} claims denied due to missing documentation.";
+                    }
+                    else if (normalizedPrompt.Contains("submitted"))
+                    {
+                        var count = patients.Count(p => p.ClaimStatus.Contains("Submitted", StringComparison.OrdinalIgnoreCase));
+                        exactAnswerInstruction = $"There are exactly {count} submitted claims currently processing.";
+                    }
+                    else if (normalizedPrompt.Contains("driving our medical expense") || normalizedPrompt.Contains("high-cost members") || normalizedPrompt.Contains("highest expense"))
+                    {
+                        var top = targetPatients.OrderByDescending(p => p.Expense).Take(5).ToList();
+                        var names = string.Join(", ", top.Select(p => "${p.Name} ($)"));
+                        exactAnswerInstruction = $"The high-cost members driving our medical expense are: {names}.";
+                    }
+                    else if (normalizedPrompt.Contains("average") || normalizedPrompt.Contains("avg") || normalizedPrompt.Contains("mean"))
+                    {
+                        if (normalizedPrompt.Contains("expense")) exactAnswerInstruction = $"The average expense is $.";
+                        else if (normalizedPrompt.Contains("pmpm")) exactAnswerInstruction = $"The average PMPM is $.";
+                        else if (normalizedPrompt.Contains("er util")) exactAnswerInstruction = $"The average ER utilization is {targetPatients.Average(p => p.ERUtilization):0.##}%.";
+                        else if (normalizedPrompt.Contains("care gap")) exactAnswerInstruction = $"The average open care gaps is {targetPatients.Average(p => p.OpenCareGaps):0.##}.";
+                        else exactAnswerInstruction = $"The average expense is $ and average PMPM is $.";
+                    }
+                    else if (normalizedPrompt.Contains("highest") || normalizedPrompt.Contains("most") || normalizedPrompt.Contains("top"))
+                    {
+                        if (normalizedPrompt.Contains("pmpm")) exactAnswerInstruction = $"The highest PMPM belongs to {targetPatients.OrderByDescending(p => p.Pmpm).First().Name}.";
+                        else if (normalizedPrompt.Contains("er util")) exactAnswerInstruction = $"The highest ER utilization rate belongs to {targetPatients.OrderByDescending(p => p.ERUtilization).First().Name}.";
+                        else if (normalizedPrompt.Contains("care gap")) exactAnswerInstruction = $"{targetPatients.OrderByDescending(p => p.OpenCareGaps).First().Name} has the most open care gaps.";
+                        else exactAnswerInstruction = $"The highest expense belongs to {targetPatients.OrderByDescending(p => p.Expense).First().Name}.";
+                    }
+                    else if (normalizedPrompt.Contains("lowest") || normalizedPrompt.Contains("least") || normalizedPrompt.Contains("bottom"))
+                    {
+                        exactAnswerInstruction = $"The lowest expense belongs to {targetPatients.OrderBy(p => p.Expense).First().Name}.";
+                    }
+                    else if (normalizedPrompt.Contains("how many") || normalizedPrompt.Contains("count") || normalizedPrompt.Contains("total"))
+                    {
+                        if (normalizedPrompt.Contains("critical")) exactAnswerInstruction = $"There are {patients.Count(p => p.RiskTier.Contains("Critical", StringComparison.OrdinalIgnoreCase))} patients in the Critical risk tier.";
+                        else if (normalizedPrompt.Contains("high")) exactAnswerInstruction = $"There are {patients.Count(p => p.RiskTier.Contains("High", StringComparison.OrdinalIgnoreCase))} patients in the High risk tier.";
+                        else if (normalizedPrompt.Contains("approved")) exactAnswerInstruction = $"There are {patients.Count(p => p.ClaimStatus.Contains("Approved", StringComparison.OrdinalIgnoreCase))} approved claims.";
+                        else exactAnswerInstruction = $"There are {patients.Count} total patients in the dataset.";
+                    }
+                    else
+                    {
+                        var patient = targetPatients.FirstOrDefault(p => normalizedPrompt.Contains(p.Name.ToLowerInvariant()));
+                        if (patient != null)
+                        {
+                            exactAnswerInstruction = $"Here is the information for {patient.Name}: Expense is $, Plan is {patient.HealthCarePlan}, PMPM is $, Risk Tier is {patient.RiskTier}, ER Utilization is {patient.ERUtilization}%, Open Care Gaps is {patient.OpenCareGaps}, Specific Attachment Point is $, Claim Status is {patient.ClaimStatus}, Denial Reason is '{patient.DenialReason}', Filing Deadline is {patient.FilingDeadline:yyyy-MM-dd}, Provider is {patient.ProviderName}, and Has Special Attachment Point is {patient.HasSpecialAttachmentPoint}.";
+                        }
+                    }
